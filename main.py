@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks, Response
 from telephony import start_call, handle_incoming_call
 from conversation import process_conversation, store_conversation
 from dotenv import load_dotenv
@@ -9,6 +9,8 @@ from vocode.streaming.transcriber.deepgram_transcriber import DeepgramTranscribe
 from vocode.streaming.synthesizer.eleven_labs_synthesizer import ElevenLabsSynthesizer
 from vocode.streaming.models.transcriber import DeepgramTranscriberConfig
 from vocode.streaming.models.synthesizer import ElevenLabsSynthesizerConfig
+from twilio.rest import Client
+from twilio.twiml.voice_response import VoiceResponse
 
 # Load API keys from .env
 load_dotenv()
@@ -21,6 +23,22 @@ TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
 
 app = FastAPI()
 conversation_history = {}
+
+# Initialize Twilio client
+client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+
+# Helper function to initiate the call using Twilio
+def start_call(to_phone_number: str):
+    try:
+        # Initiate the call
+        call = client.calls.create(
+            to=to_phone_number,
+            from_=TWILIO_PHONE_NUMBER,
+            url="http://localhost:8000/outgoing-call-twiml"  # Custom TwiML URL for call instructions
+        )
+        return call.sid  # Return the unique SID for the call
+    except Exception as e:
+        raise Exception(f"Error initiating call: {str(e)}")
 
 async def generate_response(user_input, phone_number):
     """Handles multi-turn conversation and generates a response."""
@@ -48,7 +66,7 @@ async def chat(user_input: str):
     return {"response": response}
 
 @app.post("/call")
-async def initiate_call(phone_number: str):
+async def initiate_call_endpoint(phone_number: str):
     """Handles making an outgoing call"""
     try:
         call_sid = start_call(phone_number)
@@ -57,10 +75,19 @@ async def initiate_call(phone_number: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/incoming-call")
-async def handle_call(phone_number: str):
+async def handle_incoming_call_endpoint(phone_number: str):
     """Handles incoming calls asynchronously"""
     response = handle_incoming_call()
     return Response(content=response, media_type="application/xml")
+
+@app.get("/outgoing-call-twiml")
+def outgoing_call_twiml():
+    """Provides the TwiML instructions for the outgoing call."""
+    response = VoiceResponse()
+    response.say("Hello, this is a test call from our AI voice agent.")
+    response.pause(length=2)  # Optional: Pause before hanging up
+    response.hangup()  # End the call after the message
+    return Response(content=str(response), media_type="application/xml")
 
 @app.post("/transcribe")
 async def transcribe_audio(file: UploadFile = File(...)):

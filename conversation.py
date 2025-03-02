@@ -1,21 +1,3 @@
-# import openai
-# import os
-
-# GPT_API_KEY = os.getenv("GPT_API_KEY")
-
-# def process_conversation(user_input):
-#     if not GPT_API_KEY:
-#         return "Error: OpenAI API key is missing."
-
-#     try:
-#         openai.api_key = GPT_API_KEY
-#         response = openai.ChatCompletion.create(
-#             model="gpt-4o",
-#             messages=[{"role": "user", "content": user_input}]
-#         )
-#         return response["choices"][0]["message"]["content"]
-#     except openai.error.OpenAIError as e:
-#         return f"Error: {str(e)}"
 
 
 import openai
